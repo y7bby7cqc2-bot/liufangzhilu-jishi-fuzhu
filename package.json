@@ -40,8 +40,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "CHANGE_ME_GITHUB_OWNER",
-        "repo": "poe2-market-alert"
+        "owner": "y7bby7cqc2-bot",
+        "repo": "liufangzhilu-jishi-fuzhu"
       }
     ]
   },
