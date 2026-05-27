@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>POE2 集市提醒器</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">P2</span>
+          <div>
+            <p>POE2 Market Watch</p>
+            <h1>集市提醒器</h1>
+          </div>
+        </div>
+
+        <div class="status-card">
+          <span id="runState">未启动</span>
+          <strong id="watchCount">0</strong>
+          <small>个搜索正在列表中</small>
+        </div>
+
+        <div class="sidebar-actions">
+          <button class="primary-button" id="startAll" type="button">开始监控</button>
+          <button class="secondary-button" id="stopAll" type="button">停止监控</button>
+          <button class="secondary-button" id="openLogin" type="button">打开登录窗口</button>
+          <button class="secondary-button" id="checkUpdate" type="button">检查更新</button>
+          <button class="secondary-button" id="installUpdate" type="button" hidden>安装并重启</button>
+          <p class="update-status" id="updateStatus">当前版本检查中...</p>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <section class="panel add-panel" aria-labelledby="add-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">搜索链接</p>
+              <h2 id="add-title">添加一个市集搜索</h2>
+            </div>
+          </div>
+
+          <form id="watchForm" class="watch-form">
+            <label>
+              <span>名称</span>
+              <input id="watchName" maxlength="40" placeholder="例如：高抗戒指" required />
+            </label>
+            <label>
+              <span>搜索 URL</span>
+              <input id="watchUrl" placeholder="https://www.pathofexile.com/trade2/search/poe2/..." required />
+            </label>
+            <div class="form-row">
+              <label>
+                <span>检查间隔（秒）</span>
+                <input id="watchInterval" min="30" step="5" type="number" value="60" />
+              </label>
+              <label>
+                <span>结果选择器</span>
+                <input id="watchSelector" value=".row, .resultset .row, [data-id]" />
+              </label>
+            </div>
+            <button class="primary-button" type="submit">添加搜索</button>
+          </form>
+        </section>
+
+        <section class="panel list-panel" aria-labelledby="list-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">监控列表</p>
+              <h2 id="list-title">已保存搜索</h2>
+            </div>
+            <button class="icon-button" id="refreshList" type="button" title="刷新列表">↻</button>
+          </div>
+          <div class="watch-list" id="watchList"></div>
+        </section>
+
+        <section class="panel log-panel" aria-labelledby="log-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">提醒记录</p>
+              <h2 id="log-title">最近触发</h2>
+            </div>
+            <button class="secondary-button compact" id="clearLog" type="button">清空</button>
+          </div>
+          <div class="event-log" id="eventLog"></div>
+        </section>
+      </section>
+    </main>
+
+    <template id="watchTemplate">
+      <article class="watch-card">
+        <div>
+          <div class="watch-title-row">
+            <h3></h3>
+            <span class="watch-badge"></span>
+          </div>
+          <p class="watch-url"></p>
+          <div class="watch-meta"></div>
+        </div>
+        <div class="watch-actions">
+          <button type="button" data-action="check">检查</button>
+          <button type="button" data-action="open">打开</button>
+          <button type="button" data-action="toggle"></button>
+          <button class="danger" type="button" data-action="remove">删除</button>
+        </div>
+      </article>
+    </template>
+
+    <template id="logTemplate">
+      <article class="log-item">
+        <strong></strong>
+        <span></span>
+        <button type="button">打开页面</button>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

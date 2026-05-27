@@ -1,0 +1,51 @@
+{
+  "name": "poe2-market-alert",
+  "version": "0.1.0",
+  "description": "A local POE2 market search alert desktop app.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist:win": "electron-builder --win",
+    "publish:win": "electron-builder --win --publish always"
+  },
+  "devDependencies": {
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "local.poe2.market.alert",
+    "productName": "POE2 Market Alert",
+    "files": [
+      "app.js",
+      "index.html",
+      "main.js",
+      "preload.js",
+      "README.md",
+      "styles.css",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "CHANGE_ME_GITHUB_OWNER",
+        "repo": "poe2-market-alert"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
+  }
+}
