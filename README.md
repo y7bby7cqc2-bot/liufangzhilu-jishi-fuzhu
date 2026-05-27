@@ -24,7 +24,7 @@ npm run dist:win
 
 软件已接入 `electron-updater`。普通用户不需要 Git 权限，也不需要安装 Git；只要安装包来自公开的 GitHub Releases，点击软件里的“检查更新”即可下载新版本，下载完成后点击“安装并重启”。
 
-发布前需要先把 `package.json` 里的 `build.publish.owner` 从 `CHANGE_ME_GITHUB_OWNER` 改成你的 GitHub 用户名或组织名，并确认 `repo` 是真实仓库名。之后用下面命令发布 Windows 安装包：
+发布配置已经指向 `y7bby7cqc2-bot/liufangzhilu-jishi-fuzhu`。之后用下面命令发布 Windows 安装包：
 
 ```bash
 GH_TOKEN=你的_GitHub_Token npm run publish:win
