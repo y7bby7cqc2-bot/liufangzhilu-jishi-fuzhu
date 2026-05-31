@@ -1,6 +1,6 @@
 # 授权服务器接口
 
-客户端已经预留“激活码 + 设备绑定 + 30 天有效期”的授权流程。当前推荐使用 LeanCloud 中国节点部署授权服务器，代码在 `leancloud-license-server/`。
+客户端已经预留“激活码 + 设备绑定 + 30 天有效期”的授权流程。当前推荐使用腾讯云 CloudBase 部署授权服务器，代码在 `cloudbase-license-server/`。
 
 上线收费前，需要配置环境变量 `POE2_LICENSE_SERVER_URL`，或把 `main.js` 里的 `LICENSE_SERVER_URL` 改成你的授权接口地址。
 
@@ -70,12 +70,16 @@ content-type: application/json
 - 授权成功后会缓存 24 小时离线有效期。
 - 客户端本地判断只用于体验，最终授权状态必须以服务端记录为准。
 
-## LeanCloud 中国节点
+## 腾讯云 CloudBase
 
-部署说明见 `leancloud-license-server/README.md`。
+部署说明见 `cloudbase-license-server/README.md`。
 
 部署完成后，客户端授权地址格式类似：
 
 ```text
-https://你的云引擎域名/api/license/verify
+https://你的云函数访问地址/api/license/verify
 ```
+
+## LeanCloud 备选
+
+LeanCloud 中国节点已不再支持注册新账号。如果你已有旧账号，可以参考 `leancloud-license-server/README.md`；新项目优先使用 CloudBase。
