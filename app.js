@@ -141,7 +141,7 @@ form.addEventListener("submit", async (event) => {
 
   form.reset();
   intervalInput.value = "60";
-  selectorInput.value = ".row, .resultset .row, [data-id]";
+  selectorInput.value = ".resultset .row[data-id], .resultset [data-id]";
   await refreshState();
 });
 
@@ -189,10 +189,7 @@ clearLog.addEventListener("click", async () => {
 
 api.onStateChanged((nextState) => setState(nextState));
 api.onUpdateChanged((nextState) => setUpdateState(nextState));
-api.onTriggered((event) => {
-  const title = `${event.name} 发现 ${event.resultCount} 个结果`;
-  window.alert(`${title}\n\n已打开对应搜索页面，请手动确认后再操作。`);
-});
+api.onTriggered(() => refreshState());
 
 refreshState();
 api.getUpdateStatus().then(setUpdateState);

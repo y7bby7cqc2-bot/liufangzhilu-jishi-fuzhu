@@ -3,7 +3,7 @@ const { autoUpdater } = require("electron-updater");
 const fs = require("fs");
 const path = require("path");
 
-const DEFAULT_SELECTOR = ".row, .resultset .row, [data-id]";
+const DEFAULT_SELECTOR = ".resultset .row[data-id], .resultset [data-id]";
 const LOGIN_URL = "https://www.pathofexile.com/trade2";
 
 let mainWindow;
@@ -122,6 +122,40 @@ function createBrowserWindow({ show = true, title = "POE2 市集" } = {}) {
   });
 }
 
+async function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function clickFirstTravelToHideout(win) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    if (win.isDestroyed()) return false;
+
+    const result = await win.webContents.executeJavaScript(
+      `(() => {
+        const isVisible = (node) => {
+          const rect = node.getBoundingClientRect();
+          const style = window.getComputedStyle(node);
+          return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+        };
+        const candidates = Array.from(document.querySelectorAll("button, a, [role='button']"))
+          .filter((node) => /travel\\s+to\\s+hideout/i.test((node.textContent || "").trim()))
+          .filter(isVisible);
+        const target = candidates[0];
+        if (!target) return { clicked: false };
+        target.scrollIntoView({ block: "center", inline: "center" });
+        target.click();
+        return { clicked: true, text: (target.textContent || "").trim() };
+      })();`,
+      true,
+    );
+
+    if (result.clicked) return true;
+    await wait(500);
+  }
+
+  return false;
+}
+
 async function inspectSearchPage(watch) {
   const hiddenWindow = createBrowserWindow({ show: false, title: `检查 ${watch.name}` });
 
@@ -132,18 +166,23 @@ async function inspectSearchPage(watch) {
     const result = await hiddenWindow.webContents.executeJavaScript(
       `(() => {
         const selector = ${JSON.stringify(watch.selector || DEFAULT_SELECTOR)};
+        const bodyText = document.body.innerText || "";
+        const officialCountMatch = bodyText.match(/showing\\s+(\\d+)\\s+results?/i)
+          || bodyText.match(/显示\\s*(\\d+)\\s*(?:个)?结果/i);
+        const officialCount = officialCountMatch ? Number(officialCountMatch[1]) : null;
         const nodes = Array.from(document.querySelectorAll(selector))
           .filter((node) => {
             const rect = node.getBoundingClientRect();
             const text = (node.textContent || "").trim();
-            return rect.width > 0 && rect.height > 0 && text.length > 0;
+            const hasTradeControls = /asking price|listed|travel to hideout|ignore player/i.test(text);
+            return rect.width > 0 && rect.height > 0 && text.length > 0 && hasTradeControls;
           });
         const rows = nodes.slice(0, 10).map((node) => (node.textContent || "").replace(/\\s+/g, " ").trim());
         return {
-          count: nodes.length,
+          count: officialCount ?? nodes.length,
           fingerprint: rows.join("|").slice(0, 2000),
           title: document.title,
-          needsLogin: /登录|login|sign in/i.test(document.body.innerText || "")
+          needsLogin: /登录|login|sign in/i.test(bodyText)
         };
       })();`,
       true,
@@ -153,10 +192,10 @@ async function inspectSearchPage(watch) {
     watch.lastResultCount = result.count;
     watch.lastError = result.needsLogin ? "页面可能需要重新登录。请点击“打开登录窗口”后再检查。" : "";
 
-    const isNewHit = result.count > 0 && result.fingerprint && result.fingerprint !== watch.lastFingerprint;
+    const hasHit = result.count > 0;
     watch.lastFingerprint = result.fingerprint || "";
 
-    if (isNewHit) {
+    if (hasHit) {
       const event = {
         id: makeId(),
         watchId: watch.id,
@@ -167,7 +206,7 @@ async function inspectSearchPage(watch) {
       };
       store.events.unshift(event);
       store.events = store.events.slice(0, 50);
-      notifyHit(event);
+      await notifyHit(event);
     }
   } catch (error) {
     watch.lastCheckedAt = new Date().toISOString();
@@ -179,17 +218,17 @@ async function inspectSearchPage(watch) {
   emitState();
 }
 
-function notifyHit(event) {
+async function notifyHit(event) {
   if (Notification.isSupported()) {
     const notification = new Notification({
       title: `${event.name} 有新结果`,
-      body: `发现 ${event.resultCount} 个结果。已打开页面，请手动确认。`,
+      body: `发现 ${event.resultCount} 个结果。正在尝试进入第一个结果的藏身处。`,
     });
     notification.on("click", () => openWatch(event.watchId));
     notification.show();
   }
 
-  openWatch(event.watchId);
+  await openWatch(event.watchId, { autoTravelToHideout: true });
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("watch:triggered", event);
     mainWindow.show();
@@ -233,11 +272,14 @@ function findWatch(id) {
   return store.watches.find((watch) => watch.id === id);
 }
 
-async function openWatch(id) {
+async function openWatch(id, { autoTravelToHideout = false } = {}) {
   const watch = findWatch(id);
   if (!watch) return false;
   const win = createBrowserWindow({ show: true, title: watch.name });
   await win.loadURL(watch.url);
+  if (autoTravelToHideout) {
+    await clickFirstTravelToHideout(win);
+  }
   return true;
 }
 
