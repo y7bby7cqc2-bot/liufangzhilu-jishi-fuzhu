@@ -1,0 +1,16 @@
+{
+  "name": "poe2-license-server",
+  "version": "0.1.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "leanengine": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

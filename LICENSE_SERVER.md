@@ -1,6 +1,8 @@
 # 授权服务器接口
 
-客户端已经预留“激活码 + 设备绑定 + 30 天有效期”的授权流程。上线收费前，需要配置环境变量 `POE2_LICENSE_SERVER_URL`，或把 `main.js` 里的 `LICENSE_SERVER_URL` 改成你的授权接口地址。
+客户端已经预留“激活码 + 设备绑定 + 30 天有效期”的授权流程。当前推荐使用 LeanCloud 中国节点部署授权服务器，代码在 `leancloud-license-server/`。
+
+上线收费前，需要配置环境变量 `POE2_LICENSE_SERVER_URL`，或把 `main.js` 里的 `LICENSE_SERVER_URL` 改成你的授权接口地址。
 
 ## 客户端请求
 
@@ -67,3 +69,13 @@ content-type: application/json
 - 月卡有效时自动传送不限次数。
 - 授权成功后会缓存 24 小时离线有效期。
 - 客户端本地判断只用于体验，最终授权状态必须以服务端记录为准。
+
+## LeanCloud 中国节点
+
+部署说明见 `leancloud-license-server/README.md`。
+
+部署完成后，客户端授权地址格式类似：
+
+```text
+https://你的云引擎域名/api/license/verify
+```
