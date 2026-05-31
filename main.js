@@ -9,7 +9,8 @@ const DEFAULT_SELECTOR = ".resultset .row[data-id], .resultset [data-id]";
 const LOGIN_URL = "https://www.pathofexile.com/trade2";
 const FREE_TRAVEL_LIMIT = 1;
 const LICENSE_OFFLINE_CACHE_MS = 24 * 60 * 60 * 1000;
-const LICENSE_SERVER_URL = process.env.POE2_LICENSE_SERVER_URL || "";
+const LICENSE_SERVER_URL = process.env.POE2_LICENSE_SERVER_URL
+  || "https://poe2-license-d0gfpfta2f4454ec5.service.tcloudbase.com/api/license/verify";
 
 let mainWindow;
 let storePath;

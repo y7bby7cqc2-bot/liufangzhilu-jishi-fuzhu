@@ -146,7 +146,6 @@ async function createLicenses(event, body) {
 
 exports.main = async (event) => {
   const method = getMethod(event);
-  const path = getPath(event);
 
   if (method === "OPTIONS") {
     return response(204, {});
@@ -158,12 +157,12 @@ exports.main = async (event) => {
 
   const body = parseBody(event);
 
-  if (method === "POST" && path.endsWith("/api/license/verify")) {
-    return verifyLicense(body);
+  if (method === "POST" && Object.prototype.hasOwnProperty.call(body, "count")) {
+    return createLicenses(event, body);
   }
 
-  if (method === "POST" && path.endsWith("/api/admin/licenses")) {
-    return createLicenses(event, body);
+  if (method === "POST") {
+    return verifyLicense(body);
   }
 
   return response(404, { ok: false, message: "接口不存在。" });

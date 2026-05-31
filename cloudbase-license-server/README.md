@@ -48,19 +48,20 @@ ADMIN_TOKEN=你自己设置的一串管理员密钥
 
 这个密钥只给你自己生成激活码用，不能发给用户。
 
+当前本地部署配置里的 `ADMIN_TOKEN` 已写在 `cloudbaserc.json`，该文件已加入 `.gitignore`，不会提交到 GitHub。
+
 ## 4. 配置 HTTP 访问路径
 
-给 HTTP 云函数开启公网访问后，你会得到一个访问地址。最终客户端需要的校验地址是：
+当前已部署的 HTTP 访问服务地址：
 
 ```text
-https://你的云函数访问地址/api/license/verify
+https://poe2-license-d0gfpfta2f4454ec5.service.tcloudbase.com/api
 ```
 
-如果 CloudBase 控制台要求你配置路径，建议配置：
+客户端校验地址是：
 
 ```text
-/api/license/verify
-/api/admin/licenses
+https://poe2-license-d0gfpfta2f4454ec5.service.tcloudbase.com/api/license/verify
 ```
 
 ## 5. 生成激活码
@@ -68,7 +69,7 @@ https://你的云函数访问地址/api/license/verify
 部署后，用下面命令生成激活码：
 
 ```bash
-curl -X POST "https://你的云函数访问地址/api/admin/licenses" \
+curl -X POST "https://poe2-license-d0gfpfta2f4454ec5.service.tcloudbase.com/api/admin/licenses" \
   -H "content-type: application/json" \
   -H "authorization: Bearer 你的_ADMIN_TOKEN" \
   -d '{"count": 10}'
@@ -126,10 +127,11 @@ POST /api/license/verify
 
 ## 7. 接入客户端
 
-部署成功并测试通过后，把客户端 [../main.js](../main.js) 里的授权地址改成你的接口：
+客户端 [../main.js](../main.js) 已接入当前 CloudBase 地址：
 
 ```js
-const LICENSE_SERVER_URL = "https://你的云函数访问地址/api/license/verify";
+const LICENSE_SERVER_URL = process.env.POE2_LICENSE_SERVER_URL
+  || "https://poe2-license-d0gfpfta2f4454ec5.service.tcloudbase.com/api/license/verify";
 ```
 
-然后重新打包发布。
+重新打包发布后，用户软件会请求这个接口校验激活码。
