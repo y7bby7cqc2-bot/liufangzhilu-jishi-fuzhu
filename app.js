@@ -19,10 +19,18 @@ const refreshList = document.querySelector("#refreshList");
 const clearLog = document.querySelector("#clearLog");
 const runState = document.querySelector("#runState");
 const watchCount = document.querySelector("#watchCount");
+const licenseForm = document.querySelector("#licenseForm");
+const licenseCode = document.querySelector("#licenseCode");
+const licenseStatus = document.querySelector("#licenseStatus");
+const licenseQuota = document.querySelector("#licenseQuota");
+const licenseMessage = document.querySelector("#licenseMessage");
+const refreshLicense = document.querySelector("#refreshLicense");
+const clearLicense = document.querySelector("#clearLicense");
 
 let state = {
   watches: [],
   events: [],
+  license: null,
   isRunning: false,
 };
 
@@ -45,6 +53,15 @@ function formatTime(value) {
   }).format(new Date(value));
 }
 
+function formatDate(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
 function formatStatus(watch) {
   if (watch.lastError) return "异常";
   if (watch.lastResultCount > 0) return "有结果";
@@ -57,6 +74,7 @@ function setState(nextState) {
   runState.textContent = state.isRunning ? "监控中" : "已停止";
   watchCount.textContent = state.watches.length;
   document.body.classList.toggle("is-running", state.isRunning);
+  renderLicense();
   renderWatches();
   renderEvents();
 }
@@ -76,6 +94,19 @@ function setUpdateState(nextState) {
     checkUpdate.textContent = "检查更新";
     checkUpdate.disabled = false;
   }
+}
+
+function renderLicense() {
+  const license = state.license;
+  if (!license) return;
+
+  const active = license.status === "active";
+  licenseStatus.textContent = active ? "月卡有效" : "免费版";
+  licenseStatus.dataset.status = active ? "active" : license.status;
+  licenseQuota.textContent = active ? "不限次数" : `${license.remainingFreeTravels} 次`;
+  licenseMessage.textContent = active && license.expiresAt
+    ? `有效期至 ${formatDate(license.expiresAt)}。`
+    : license.message;
 }
 
 function renderWatches() {
@@ -185,6 +216,25 @@ installUpdate.addEventListener("click", () => api.installUpdate());
 clearLog.addEventListener("click", async () => {
   await api.clearEvents();
   await refreshState();
+});
+
+licenseForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  licenseMessage.textContent = "正在校验激活码...";
+  const license = await api.activateLicense(licenseCode.value);
+  setState({ ...state, license });
+  if (license.status === "active") licenseCode.value = "";
+});
+
+refreshLicense.addEventListener("click", async () => {
+  licenseMessage.textContent = "正在刷新授权...";
+  const license = await api.refreshLicense();
+  setState({ ...state, license });
+});
+
+clearLicense.addEventListener("click", async () => {
+  const license = await api.clearLicense();
+  setState({ ...state, license });
 });
 
 api.onStateChanged((nextState) => setState(nextState));

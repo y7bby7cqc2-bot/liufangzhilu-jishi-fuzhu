@@ -125,6 +125,63 @@ h3 {
   color: var(--muted);
 }
 
+.license-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.license-card h2 {
+  font-size: 1rem;
+}
+
+.license-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.license-line span,
+.license-message {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.license-line span[data-status="active"] {
+  color: var(--good);
+}
+
+.license-line strong {
+  color: var(--accent-strong);
+  font-size: 1.12rem;
+}
+
+.license-message {
+  min-height: 36px;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.license-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 8px;
+}
+
+.license-form input {
+  height: 38px;
+}
+
+.license-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .sidebar-actions {
   display: grid;
   gap: 10px;
@@ -216,6 +273,7 @@ input:focus {
 
 .primary-button,
 .secondary-button,
+.ghost-button,
 .icon-button,
 .watch-actions button,
 .log-item button {
@@ -234,10 +292,18 @@ input:focus {
 }
 
 .secondary-button:hover,
+.ghost-button:hover,
 .icon-button:hover,
 .watch-actions button:hover,
 .log-item button:hover {
   border-color: var(--accent);
+}
+
+.ghost-button {
+  min-height: 32px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .compact {
@@ -371,6 +437,7 @@ input:focus {
   }
 
   .form-row,
+  .license-form,
   .watch-actions,
   .log-item {
     grid-template-columns: 1fr;

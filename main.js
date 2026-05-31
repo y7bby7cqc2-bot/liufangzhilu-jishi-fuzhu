@@ -1,10 +1,15 @@
 const { app, BrowserWindow, ipcMain, Notification, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
+const crypto = require("crypto");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
 const DEFAULT_SELECTOR = ".resultset .row[data-id], .resultset [data-id]";
 const LOGIN_URL = "https://www.pathofexile.com/trade2";
+const FREE_TRAVEL_LIMIT = 1;
+const LICENSE_OFFLINE_CACHE_MS = 24 * 60 * 60 * 1000;
+const LICENSE_SERVER_URL = process.env.POE2_LICENSE_SERVER_URL || "";
 
 let mainWindow;
 let storePath;
@@ -19,6 +24,7 @@ let updateState = {
 let store = {
   watches: [],
   events: [],
+  license: null,
   isRunning: false,
 };
 
@@ -27,6 +33,35 @@ autoUpdater.autoInstallOnAppQuit = true;
 
 function makeId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function defaultLicense() {
+  return {
+    activationCode: "",
+    deviceId: "",
+    status: "free",
+    plan: "free",
+    expiresAt: null,
+    freeTravelUsed: 0,
+    lastCheckedAt: null,
+    offlineValidUntil: null,
+    message: "免费版剩余 1 次自动传送。",
+  };
+}
+
+function sanitizeLicense(input = {}) {
+  return {
+    ...defaultLicense(),
+    activationCode: String(input.activationCode || "").trim(),
+    deviceId: String(input.deviceId || ""),
+    status: String(input.status || "free"),
+    plan: String(input.plan || "free"),
+    expiresAt: input.expiresAt || null,
+    freeTravelUsed: Math.max(0, Number(input.freeTravelUsed) || 0),
+    lastCheckedAt: input.lastCheckedAt || null,
+    offlineValidUntil: input.offlineValidUntil || null,
+    message: String(input.message || ""),
+  };
 }
 
 function sanitizeWatch(input) {
@@ -53,11 +88,14 @@ function loadStore() {
     store = {
       watches: Array.isArray(loaded.watches) ? loaded.watches.map(sanitizeWatch) : [],
       events: Array.isArray(loaded.events) ? loaded.events.slice(0, 50) : [],
+      license: sanitizeLicense(loaded.license),
       isRunning: false,
     };
   } catch {
-    store = { watches: [], events: [], isRunning: false };
+    store = { watches: [], events: [], license: defaultLicense(), isRunning: false };
   }
+
+  store.license.deviceId = getDeviceId();
 }
 
 function saveStore() {
@@ -69,8 +107,160 @@ function publicState() {
   return {
     watches: store.watches,
     events: store.events,
+    license: publicLicenseState(),
     isRunning: store.isRunning,
   };
+}
+
+function getDeviceId() {
+  const existingId = store.license?.deviceId;
+  if (existingId) return existingId;
+
+  const raw = [
+    os.hostname(),
+    os.platform(),
+    os.arch(),
+    os.userInfo().username,
+    app.getPath("userData"),
+  ].join("|");
+
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
+function isPaidLicenseUsable() {
+  if (!store.license || store.license.status !== "active") return false;
+  if (!store.license.expiresAt) return false;
+  return new Date(store.license.expiresAt).getTime() > Date.now();
+}
+
+function isOfflineCacheUsable() {
+  if (!isPaidLicenseUsable()) return false;
+  if (!store.license.offlineValidUntil) return false;
+  return new Date(store.license.offlineValidUntil).getTime() > Date.now();
+}
+
+function publicLicenseState() {
+  const license = store.license || defaultLicense();
+  const remainingFreeTravels = Math.max(0, FREE_TRAVEL_LIMIT - license.freeTravelUsed);
+  const active = isPaidLicenseUsable();
+  return {
+    status: active ? "active" : license.status,
+    plan: active ? license.plan : "free",
+    expiresAt: active ? license.expiresAt : null,
+    remainingFreeTravels,
+    deviceId: license.deviceId || getDeviceId(),
+    lastCheckedAt: license.lastCheckedAt,
+    message: license.message || (active ? "月卡有效，自动传送不限次数。" : `免费版剩余 ${remainingFreeTravels} 次自动传送。`),
+  };
+}
+
+async function verifyLicenseWithServer(activationCode) {
+  if (!LICENSE_SERVER_URL) {
+    throw new Error("还未配置授权服务器地址。上线收费前需要接入服务端校验接口。");
+  }
+
+  const response = await fetch(LICENSE_SERVER_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      activationCode,
+      deviceId: getDeviceId(),
+      appVersion: app.getVersion(),
+      platform: process.platform,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`授权服务器返回 ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (!data.ok) {
+    throw new Error(data.message || "激活码无效或已绑定其他设备。");
+  }
+
+  if (!data.expiresAt || new Date(data.expiresAt).getTime() <= Date.now()) {
+    throw new Error("激活码已过期。");
+  }
+
+  return data;
+}
+
+async function activateLicense(activationCode) {
+  const normalizedCode = String(activationCode || "").trim();
+  if (!normalizedCode) {
+    store.license.message = "请输入激活码。";
+    emitState();
+    return publicLicenseState();
+  }
+
+  try {
+    const result = await verifyLicenseWithServer(normalizedCode);
+    store.license = sanitizeLicense({
+      ...store.license,
+      activationCode: normalizedCode,
+      deviceId: getDeviceId(),
+      status: "active",
+      plan: result.plan || "monthly",
+      expiresAt: result.expiresAt,
+      lastCheckedAt: new Date().toISOString(),
+      offlineValidUntil: new Date(Date.now() + LICENSE_OFFLINE_CACHE_MS).toISOString(),
+      message: result.message || "月卡已激活，自动传送不限次数。",
+    });
+  } catch (error) {
+    store.license = sanitizeLicense({
+      ...store.license,
+      activationCode: normalizedCode,
+      deviceId: getDeviceId(),
+      status: isOfflineCacheUsable() ? "active" : "error",
+      lastCheckedAt: new Date().toISOString(),
+      message: error.message || String(error),
+    });
+  }
+
+  emitState();
+  return publicLicenseState();
+}
+
+async function refreshLicense() {
+  if (!store.license?.activationCode) {
+    emitState();
+    return publicLicenseState();
+  }
+
+  return activateLicense(store.license.activationCode);
+}
+
+function clearLicense() {
+  store.license = {
+    ...defaultLicense(),
+    deviceId: getDeviceId(),
+    freeTravelUsed: store.license?.freeTravelUsed || 0,
+  };
+  emitState();
+  return publicLicenseState();
+}
+
+async function authorizeAutoTravel() {
+  if (isPaidLicenseUsable()) {
+    if (isOfflineCacheUsable()) {
+      return { allowed: true, mode: "paid" };
+    }
+
+    await refreshLicense();
+    if (isPaidLicenseUsable()) {
+      return { allowed: true, mode: "paid" };
+    }
+  }
+
+  if (store.license.freeTravelUsed < FREE_TRAVEL_LIMIT) {
+    store.license.freeTravelUsed += 1;
+    store.license.message = "已使用免费自动传送机会。";
+    return { allowed: true, mode: "free" };
+  }
+
+  store.license.message = "免费自动传送次数已用完，请输入月卡激活码。";
+  return { allowed: false, mode: "locked" };
 }
 
 function emitState() {
@@ -219,18 +409,22 @@ async function inspectSearchPage(watch) {
 }
 
 async function notifyHit(event) {
+  const travelAuth = await authorizeAutoTravel();
+
   if (Notification.isSupported()) {
     const notification = new Notification({
       title: `${event.name} 有新结果`,
-      body: `发现 ${event.resultCount} 个结果。正在尝试进入第一个结果的藏身处。`,
+      body: travelAuth.allowed
+        ? `发现 ${event.resultCount} 个结果。正在尝试进入第一个结果的藏身处。`
+        : `发现 ${event.resultCount} 个结果。自动传送次数已用完。`,
     });
     notification.on("click", () => openWatch(event.watchId));
     notification.show();
   }
 
-  await openWatch(event.watchId, { autoTravelToHideout: true });
+  await openWatch(event.watchId, { autoTravelToHideout: travelAuth.allowed });
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("watch:triggered", event);
+    mainWindow.webContents.send("watch:triggered", { ...event, travelMode: travelAuth.mode });
     mainWindow.show();
   }
 }
@@ -285,6 +479,10 @@ async function openWatch(id, { autoTravelToHideout = false } = {}) {
 
 function registerIpc() {
   ipcMain.handle("state:get", () => publicState());
+  ipcMain.handle("license:get", () => publicLicenseState());
+  ipcMain.handle("license:activate", (_event, activationCode) => activateLicense(activationCode));
+  ipcMain.handle("license:refresh", () => refreshLicense());
+  ipcMain.handle("license:clear", () => clearLicense());
   ipcMain.handle("update:get-status", () => updateState);
 
   ipcMain.handle("watch:add", (_event, input) => {

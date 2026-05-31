@@ -23,6 +23,26 @@
           <small>个搜索正在列表中</small>
         </div>
 
+        <section class="license-card" aria-labelledby="license-title">
+          <div>
+            <p class="eyebrow">授权</p>
+            <h2 id="license-title">自动传送</h2>
+          </div>
+          <div class="license-line">
+            <span id="licenseStatus">免费版</span>
+            <strong id="licenseQuota">1 次</strong>
+          </div>
+          <p class="license-message" id="licenseMessage">免费版剩余 1 次自动传送。</p>
+          <form class="license-form" id="licenseForm">
+            <input id="licenseCode" autocomplete="off" placeholder="输入月卡激活码" />
+            <button class="secondary-button compact" type="submit">激活</button>
+          </form>
+          <div class="license-actions">
+            <button class="ghost-button" id="refreshLicense" type="button">刷新授权</button>
+            <button class="ghost-button" id="clearLicense" type="button">清除</button>
+          </div>
+        </section>
+
         <div class="sidebar-actions">
           <button class="primary-button" id="startAll" type="button">开始监控</button>
           <button class="secondary-button" id="stopAll" type="button">停止监控</button>
