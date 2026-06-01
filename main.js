@@ -22,6 +22,7 @@ let updateState = {
   canDownload: false,
   canInstall: false,
 };
+let isInstallingUpdate = false;
 let store = {
   watches: [],
   events: [],
@@ -580,7 +581,25 @@ function registerIpc() {
 
   ipcMain.handle("update:install", () => {
     if (!updateState.canInstall) return false;
-    autoUpdater.quitAndInstall(false, true);
+    isInstallingUpdate = true;
+    stopAll();
+    setUpdateState({
+      status: "installing",
+      message: "正在关闭软件并安装更新...",
+      progress: 100,
+      canDownload: false,
+      canInstall: false,
+    });
+
+    setImmediate(() => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) {
+          window.removeAllListeners("close");
+          window.destroy();
+        }
+      }
+      autoUpdater.quitAndInstall(true, true);
+    });
     return true;
   });
 }
@@ -667,5 +686,6 @@ app.on("before-quit", () => {
 });
 
 app.on("window-all-closed", () => {
+  if (isInstallingUpdate) return;
   if (process.platform !== "darwin") app.quit();
 });
