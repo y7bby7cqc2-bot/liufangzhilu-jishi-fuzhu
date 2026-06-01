@@ -198,9 +198,12 @@ h3 {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(360px, 0.92fr) minmax(360px, 1.08fr);
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 18px;
-  align-content: start;
+  align-content: stretch;
+  height: 100vh;
+  overflow: hidden;
   padding: 24px;
 }
 
@@ -217,13 +220,23 @@ h3 {
   padding: 20px;
 }
 
+.add-panel {
+  grid-column: 1 / -1;
+}
+
 .list-panel,
 .log-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.list-panel {
   min-height: 280px;
 }
 
 .log-panel {
-  grid-column: 1 / -1;
+  min-height: 280px;
 }
 
 .panel-heading,
@@ -240,9 +253,15 @@ h3 {
   margin-top: 20px;
 }
 
-.form-row {
+.top-row {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 1fr 0.72fr 0.72fr 1.48fr;
   gap: 12px;
 }
 
@@ -319,7 +338,36 @@ input:focus {
 .event-log {
   display: grid;
   gap: 12px;
+  flex: 1;
+  align-content: start;
   margin-top: 18px;
+}
+
+.watch-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.event-log {
+  overflow-y: auto;
+}
+
+.watch-list::-webkit-scrollbar,
+.event-log::-webkit-scrollbar {
+  width: 8px;
+}
+
+.watch-list::-webkit-scrollbar-track,
+.event-log::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: #101316;
+}
+
+.watch-list::-webkit-scrollbar-thumb,
+.event-log::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #43505a;
 }
 
 .watch-card,
@@ -332,8 +380,8 @@ input:focus {
 
 .watch-card {
   display: grid;
-  gap: 14px;
-  padding: 16px;
+  gap: 10px;
+  padding: 14px;
 }
 
 .watch-url {
@@ -344,9 +392,18 @@ input:focus {
 }
 
 .watch-meta,
+.watch-progress,
 .watch-error {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.watch-progress {
+  margin: 8px 0 4px;
+}
+
+.watch-progress strong {
+  color: var(--accent-strong);
 }
 
 .watch-error {
@@ -367,6 +424,12 @@ input:focus {
 .watch-badge[data-status="有结果"] {
   background: rgba(99, 185, 142, 0.15);
   color: var(--good);
+}
+
+.watch-badge[data-status="已完成"],
+.watch-badge[data-status="已暂停"] {
+  background: rgba(217, 168, 78, 0.13);
+  color: var(--accent-strong);
 }
 
 .watch-badge[data-status="异常"] {
@@ -436,7 +499,8 @@ input:focus {
     padding: 16px;
   }
 
-  .form-row,
+  .top-row,
+  .settings-row,
   .license-form,
   .watch-actions,
   .log-item {

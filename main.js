@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, Notification, shell, globalShortcut } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const crypto = require("crypto");
 const fs = require("fs");
@@ -6,6 +6,10 @@ const os = require("os");
 const path = require("path");
 
 const DEFAULT_SELECTOR = ".resultset .row[data-id], .resultset [data-id]";
+const DEFAULT_TARGET_QUANTITY = 1;
+const MAX_TARGET_QUANTITY = 999;
+const DEFAULT_TRAVEL_DELAY_SECONDS = 30;
+const DEFAULT_TRAVEL_HOTKEY = "F8";
 const LOGIN_URL = "https://www.pathofexile.com/trade2";
 const FREE_TRAVEL_LIMIT = 1;
 const LICENSE_OFFLINE_CACHE_MS = 24 * 60 * 60 * 1000;
@@ -15,6 +19,8 @@ const LICENSE_SERVER_URL = process.env.POE2_LICENSE_SERVER_URL
 let mainWindow;
 let storePath;
 let timers = new Map();
+let activeTravelSessions = new Map();
+let registeredTravelHotkeys = new Set();
 let updateState = {
   status: "idle",
   message: `当前版本 ${app.getVersion()}`,
@@ -35,6 +41,17 @@ autoUpdater.autoInstallOnAppQuit = true;
 
 function makeId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function clampInteger(value, { min, max, fallback }) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function normalizeHotkey(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  return /^F([1-9]|1[0-2])$/.test(normalized) ? normalized : DEFAULT_TRAVEL_HOTKEY;
 }
 
 function defaultLicense() {
@@ -69,11 +86,31 @@ function sanitizeLicense(input = {}) {
 function sanitizeWatch(input) {
   const url = new URL(input.url);
   const intervalSeconds = Math.max(30, Number(input.intervalSeconds) || 60);
+  const targetQuantity = clampInteger(input.targetQuantity, {
+    min: 1,
+    max: MAX_TARGET_QUANTITY,
+    fallback: DEFAULT_TARGET_QUANTITY,
+  });
+  const purchasedQuantity = clampInteger(input.purchasedQuantity, {
+    min: 0,
+    max: targetQuantity,
+    fallback: 0,
+  });
+  const travelDelaySeconds = clampInteger(input.travelDelaySeconds, {
+    min: 1,
+    max: 3600,
+    fallback: DEFAULT_TRAVEL_DELAY_SECONDS,
+  });
+
   return {
     id: input.id || makeId(),
     name: String(input.name || url.hostname).trim().slice(0, 40),
     url: url.toString(),
     intervalSeconds,
+    targetQuantity,
+    purchasedQuantity,
+    travelDelaySeconds,
+    travelHotkey: normalizeHotkey(input.travelHotkey),
     selector: String(input.selector || DEFAULT_SELECTOR).trim(),
     enabled: input.enabled ?? true,
     lastCheckedAt: input.lastCheckedAt || null,
@@ -283,6 +320,43 @@ function setUpdateState(nextState) {
   emitUpdateState();
 }
 
+function refreshTravelHotkeys() {
+  if (!app.isReady()) return;
+
+  const wantedHotkeys = new Set(
+    store.watches
+      .map((watch) => normalizeHotkey(watch.travelHotkey))
+      .filter(Boolean),
+  );
+  wantedHotkeys.add(DEFAULT_TRAVEL_HOTKEY);
+
+  registeredTravelHotkeys.forEach((hotkey) => {
+    if (!wantedHotkeys.has(hotkey)) {
+      globalShortcut.unregister(hotkey);
+      registeredTravelHotkeys.delete(hotkey);
+    }
+  });
+
+  wantedHotkeys.forEach((hotkey) => {
+    if (registeredTravelHotkeys.has(hotkey)) return;
+    const registered = globalShortcut.register(hotkey, () => triggerTravelHotkey(hotkey));
+    if (registered) registeredTravelHotkeys.add(hotkey);
+  });
+}
+
+function triggerTravelHotkey(hotkey) {
+  const targetSession = Array.from(activeTravelSessions.values())
+    .filter((session) => session.waiting && session.hotkey === hotkey)
+    .sort((left, right) => left.waitingSince - right.waitingSince)[0];
+
+  if (targetSession) targetSession.resolveWait("hotkey");
+}
+
+function cancelTravelSession(id, reason = "cancelled") {
+  const session = activeTravelSessions.get(id);
+  if (session) session.resolveWait(reason);
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1180,
@@ -318,25 +392,53 @@ async function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function clickFirstTravelToHideout(win) {
+async function clickNextTravelToHideout(win, watch) {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     if (win.isDestroyed()) return false;
 
     const result = await win.webContents.executeJavaScript(
       `(() => {
+        const rowSelector = ${JSON.stringify(watch.selector || DEFAULT_SELECTOR)};
         const isVisible = (node) => {
           const rect = node.getBoundingClientRect();
           const style = window.getComputedStyle(node);
           return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
         };
+        const findRow = (node) => {
+          try {
+            const row = node.closest(rowSelector);
+            if (row) return row;
+          } catch {}
+          return node.closest("[data-id]") || node.closest(".row") || node.parentElement || node;
+        };
         const candidates = Array.from(document.querySelectorAll("button, a, [role='button']"))
-          .filter((node) => /travel\\s+to\\s+hideout/i.test((node.textContent || "").trim()))
-          .filter(isVisible);
-        const target = candidates[0];
-        if (!target) return { clicked: false };
-        target.scrollIntoView({ block: "center", inline: "center" });
-        target.click();
-        return { clicked: true, text: (target.textContent || "").trim() };
+          .filter((node) => /^travel\\s+to\\s+hideout$/i.test((node.textContent || "").replace(/\\s+/g, " ").trim()))
+          .filter(isVisible)
+          .map((node) => ({ node, row: findRow(node), rect: node.getBoundingClientRect() }))
+          .sort((left, right) => left.rect.top - right.rect.top || left.rect.left - right.rect.left);
+        let skippedIgnored = 0;
+        let skippedClicked = 0;
+        const target = candidates.find((candidate) => {
+          const rowText = (candidate.row.textContent || "").replace(/\\s+/g, " ").trim();
+          if (/unignore\\s+player/i.test(rowText)) {
+            skippedIgnored += 1;
+            return false;
+          }
+          if (/\\b(?:traveling|teleporting)!?/i.test(rowText)) {
+            skippedClicked += 1;
+            return false;
+          }
+          return true;
+        });
+        if (!target) return { clicked: false, skippedIgnored, skippedClicked };
+        target.node.scrollIntoView({ block: "center", inline: "center" });
+        target.node.click();
+        return {
+          clicked: true,
+          skippedIgnored,
+          skippedClicked,
+          text: (target.node.textContent || "").trim(),
+        };
       })();`,
       true,
     );
@@ -346,6 +448,66 @@ async function clickFirstTravelToHideout(win) {
   }
 
   return false;
+}
+
+function waitForNextTravelWindow(watch, win) {
+  return new Promise((resolve) => {
+    const hotkey = normalizeHotkey(watch.travelHotkey);
+    const delayMs = watch.travelDelaySeconds * 1000;
+    const session = {
+      watchId: watch.id,
+      hotkey,
+      waiting: true,
+      waitingSince: Date.now(),
+      timeout: null,
+      resolveWait: null,
+    };
+
+    const closeHandler = () => session.resolveWait("closed");
+    session.resolveWait = (reason) => {
+      if (!session.waiting) return;
+      session.waiting = false;
+      clearTimeout(session.timeout);
+      if (!win.isDestroyed()) win.off("closed", closeHandler);
+      activeTravelSessions.delete(watch.id);
+      resolve(reason);
+    };
+
+    activeTravelSessions.set(watch.id, session);
+    win.once("closed", closeHandler);
+    session.timeout = setTimeout(() => session.resolveWait("timer"), delayMs);
+  });
+}
+
+async function runAutoTravelSequence(win, watch, maxClicks) {
+  let clickedCount = 0;
+
+  while (!win.isDestroyed() && findWatch(watch.id) === watch && watch.enabled && clickedCount < maxClicks) {
+    const remaining = Math.max(0, watch.targetQuantity - watch.purchasedQuantity);
+    if (remaining <= 0) break;
+
+    const clicked = await clickNextTravelToHideout(win, watch);
+    if (!clicked) break;
+
+    clickedCount += 1;
+    watch.purchasedQuantity = Math.min(watch.targetQuantity, watch.purchasedQuantity + 1);
+    watch.lastError = "";
+
+    if (watch.purchasedQuantity >= watch.targetQuantity) {
+      watch.enabled = false;
+      clearWatchTimer(watch.id);
+      emitState();
+      break;
+    }
+
+    emitState();
+    if (clickedCount < maxClicks) {
+      await waitForNextTravelWindow(watch, win);
+    }
+  }
+
+  activeTravelSessions.delete(watch.id);
+  return clickedCount;
 }
 
 async function inspectSearchPage(watch) {
@@ -398,7 +560,7 @@ async function inspectSearchPage(watch) {
       };
       store.events.unshift(event);
       store.events = store.events.slice(0, 50);
-      await notifyHit(event);
+      await notifyHit(watch, event);
     }
   } catch (error) {
     watch.lastCheckedAt = new Date().toISOString();
@@ -410,21 +572,35 @@ async function inspectSearchPage(watch) {
   emitState();
 }
 
-async function notifyHit(event) {
+async function notifyHit(watch, event) {
+  const remainingQuantity = Math.max(0, watch.targetQuantity - watch.purchasedQuantity);
+  if (remainingQuantity <= 0) {
+    watch.enabled = false;
+    clearWatchTimer(watch.id);
+    emitState();
+    return;
+  }
+
   const travelAuth = await authorizeAutoTravel();
+  const maxAutoTravelClicks = travelAuth.allowed
+    ? Math.min(remainingQuantity, travelAuth.mode === "free" ? 1 : remainingQuantity)
+    : 0;
 
   if (Notification.isSupported()) {
     const notification = new Notification({
       title: `${event.name} 有新结果`,
       body: travelAuth.allowed
-        ? `发现 ${event.resultCount} 个结果。正在尝试进入第一个结果的藏身处。`
+        ? `发现 ${event.resultCount} 个结果。正在按顺序传送，目标 ${watch.purchasedQuantity}/${watch.targetQuantity}。`
         : `发现 ${event.resultCount} 个结果。自动传送次数已用完。`,
     });
     notification.on("click", () => openWatch(event.watchId));
     notification.show();
   }
 
-  await openWatch(event.watchId, { autoTravelToHideout: travelAuth.allowed });
+  await openWatch(event.watchId, {
+    autoTravelToHideout: travelAuth.allowed,
+    maxAutoTravelClicks,
+  });
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("watch:triggered", { ...event, travelMode: travelAuth.mode });
     mainWindow.show();
@@ -461,6 +637,7 @@ function stopAll() {
   store.isRunning = false;
   timers.forEach((timer) => clearTimeout(timer));
   timers.clear();
+  Array.from(activeTravelSessions.keys()).forEach((id) => cancelTravelSession(id, "stopped"));
   emitState();
 }
 
@@ -468,13 +645,13 @@ function findWatch(id) {
   return store.watches.find((watch) => watch.id === id);
 }
 
-async function openWatch(id, { autoTravelToHideout = false } = {}) {
+async function openWatch(id, { autoTravelToHideout = false, maxAutoTravelClicks = 1 } = {}) {
   const watch = findWatch(id);
   if (!watch) return false;
   const win = createBrowserWindow({ show: true, title: watch.name });
   await win.loadURL(watch.url);
   if (autoTravelToHideout) {
-    await clickFirstTravelToHideout(win);
+    await runAutoTravelSequence(win, watch, maxAutoTravelClicks);
   }
   return true;
 }
@@ -489,14 +666,17 @@ function registerIpc() {
 
   ipcMain.handle("watch:add", (_event, input) => {
     store.watches.unshift(sanitizeWatch(input));
+    refreshTravelHotkeys();
     emitState();
     return publicState();
   });
 
   ipcMain.handle("watch:remove", (_event, id) => {
     clearWatchTimer(id);
+    cancelTravelSession(id, "removed");
     store.watches = store.watches.filter((watch) => watch.id !== id);
     store.events = store.events.filter((event) => event.watchId !== id);
+    refreshTravelHotkeys();
     emitState();
     return publicState();
   });
@@ -505,6 +685,9 @@ function registerIpc() {
     const watch = findWatch(id);
     if (!watch) return publicState();
     watch.enabled = !watch.enabled;
+    if (watch.enabled && watch.purchasedQuantity >= watch.targetQuantity) {
+      watch.purchasedQuantity = 0;
+    }
     if (watch.enabled) scheduleWatch(watch);
     else clearWatchTimer(id);
     emitState();
@@ -668,6 +851,7 @@ app.whenReady().then(() => {
   loadStore();
   registerIpc();
   registerUpdaterEvents();
+  refreshTravelHotkeys();
   createMainWindow();
 
   app.on("activate", () => {
@@ -677,6 +861,8 @@ app.whenReady().then(() => {
 
 app.on("before-quit", () => {
   stopAll();
+  registeredTravelHotkeys.forEach((hotkey) => globalShortcut.unregister(hotkey));
+  registeredTravelHotkeys.clear();
 });
 
 app.on("window-all-closed", () => {

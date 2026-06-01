@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UI Preview - Buy Quantity</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #101316;
+        --panel: #181d21;
+        --panel-strong: #20262c;
+        --ink: #eef3f5;
+        --muted: #98a5ad;
+        --line: #303941;
+        --accent: #d9a84e;
+        --accent-strong: #f0c36a;
+        --good: #63b98e;
+        --bad: #e06969;
+        --shadow: 0 22px 70px rgba(0, 0, 0, 0.34);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 1180px;
+        height: 760px;
+        margin: 0;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: 292px minmax(0, 1fr);
+        height: 760px;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        padding: 26px;
+        border-right: 1px solid var(--line);
+        background: #13171a;
+      }
+
+      .brand {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 46px;
+        height: 46px;
+        place-items: center;
+        border: 1px solid rgba(217, 168, 78, 0.5);
+        border-radius: 8px;
+        background: rgba(217, 168, 78, 0.13);
+        color: var(--accent-strong);
+        font-weight: 900;
+      }
+
+      .brand p,
+      .eyebrow {
+        margin: 0 0 4px;
+        color: var(--accent);
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 1.45rem;
+        line-height: 1.12;
+      }
+
+      h2 {
+        font-size: 1.28rem;
+      }
+
+      h3 {
+        font-size: 0.98rem;
+      }
+
+      .status-card,
+      .license-card,
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .status-card {
+        display: grid;
+        gap: 6px;
+        padding: 18px;
+      }
+
+      .status-card span,
+      .status-card small,
+      .license-message,
+      .license-line span {
+        color: var(--muted);
+      }
+
+      .status-card strong {
+        font-size: 3.2rem;
+        line-height: 1;
+      }
+
+      .license-card {
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+      }
+
+      .license-card h2 {
+        font-size: 1rem;
+      }
+
+      .license-line,
+      .panel-heading,
+      .watch-title-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .license-line strong {
+        color: var(--accent-strong);
+      }
+
+      .license-message {
+        min-height: 36px;
+        font-size: 0.84rem;
+        line-height: 1.45;
+      }
+
+      .license-form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 72px;
+        gap: 8px;
+      }
+
+      .license-actions,
+      .sidebar-actions {
+        display: grid;
+        gap: 8px;
+      }
+
+      .license-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .sidebar-actions {
+        margin-top: auto;
+        gap: 10px;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 310px;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 18px;
+        padding: 24px;
+      }
+
+      .add-panel {
+        grid-column: 1 / -1;
+        padding: 20px;
+        box-shadow: var(--shadow);
+      }
+
+      .list-panel,
+      .log-panel {
+        min-height: 0;
+        padding: 18px;
+        box-shadow: var(--shadow);
+      }
+
+      .watch-form {
+        display: grid;
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .top-row {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .settings-row {
+        display: grid;
+        grid-template-columns: 1fr 0.72fr 0.72fr 1.48fr;
+        gap: 12px;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+        color: var(--muted);
+        font-size: 0.84rem;
+        font-weight: 700;
+      }
+
+      input {
+        width: 100%;
+        min-width: 0;
+        height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        outline: 0;
+        background: #111518;
+        color: var(--ink);
+        padding: 0 12px;
+      }
+
+      .primary-button,
+      .secondary-button,
+      .ghost-button,
+      .icon-button,
+      .watch-actions button,
+      .log-item button {
+        min-height: 40px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-strong);
+        color: var(--ink);
+        font-weight: 800;
+      }
+
+      .primary-button {
+        border-color: #b9862f;
+        background: var(--accent);
+        color: #17130b;
+      }
+
+      .ghost-button {
+        min-height: 32px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+
+      .compact {
+        min-height: 34px;
+        padding: 0 12px;
+      }
+
+      .icon-button {
+        width: 40px;
+      }
+
+      .watch-list {
+        display: grid;
+        gap: 10px;
+        max-height: 346px;
+        margin-top: 14px;
+        overflow-y: auto;
+        padding-right: 8px;
+      }
+
+      .watch-list::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .watch-list::-webkit-scrollbar-track {
+        background: #101316;
+        border-radius: 999px;
+      }
+
+      .watch-list::-webkit-scrollbar-thumb {
+        background: #43505a;
+        border-radius: 999px;
+      }
+
+      .watch-card,
+      .log-item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #12171b;
+      }
+
+      .watch-card {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .watch-meta,
+      .watch-progress,
+      .log-item span {
+        color: var(--muted);
+        font-size: 0.8rem;
+        line-height: 1.4;
+      }
+
+      .watch-progress strong {
+        color: var(--accent-strong);
+      }
+
+      .watch-badge {
+        flex: 0 0 auto;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(152, 165, 173, 0.14);
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 900;
+      }
+
+      .watch-badge.good {
+        background: rgba(99, 185, 142, 0.15);
+        color: var(--good);
+      }
+
+      .watch-badge.paused {
+        background: rgba(217, 168, 78, 0.13);
+        color: var(--accent-strong);
+      }
+
+      .watch-actions {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .watch-actions button {
+        min-height: 34px;
+        font-size: 0.78rem;
+      }
+
+      .watch-actions .danger {
+        color: var(--bad);
+      }
+
+      .event-log {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .log-item {
+        display: grid;
+        gap: 5px;
+        padding: 12px;
+      }
+
+      .log-item button {
+        min-height: 34px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">P2</span>
+          <div>
+            <p>POE2 Market Watch</p>
+            <h1>集市提醒器</h1>
+          </div>
+        </div>
+
+        <div class="status-card">
+          <span>监控中</span>
+          <strong>5</strong>
+          <small>个搜索正在列表中</small>
+        </div>
+
+        <section class="license-card">
+          <div>
+            <p class="eyebrow">授权</p>
+            <h2>自动传送</h2>
+          </div>
+          <div class="license-line">
+            <span>月卡有效</span>
+            <strong>不限次数</strong>
+          </div>
+          <p class="license-message">有效期至 2026/07/01。</p>
+          <form class="license-form">
+            <input value="" placeholder="输入月卡激活码" />
+            <button class="secondary-button compact" type="button">激活</button>
+          </form>
+          <div class="license-actions">
+            <button class="ghost-button" type="button">刷新授权</button>
+            <button class="ghost-button" type="button">清除</button>
+          </div>
+        </section>
+
+        <div class="sidebar-actions">
+          <button class="primary-button" type="button">开始监控</button>
+          <button class="secondary-button" type="button">停止监控</button>
+          <button class="secondary-button" type="button">打开登录窗口</button>
+          <button class="secondary-button" type="button">检查更新</button>
+          <p class="license-message">当前版本 0.1.5 预览</p>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <section class="panel add-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">搜索链接</p>
+              <h2>添加一个市集搜索</h2>
+            </div>
+          </div>
+
+          <form class="watch-form">
+            <div class="top-row">
+              <label>
+                <span>名称</span>
+                <input value="高抗戒指" />
+              </label>
+              <label>
+                <span>设置好搜索条件的集市网址复制到这里</span>
+                <input value="https://www.pathofexile.com/trade2/search/poe2/..." />
+              </label>
+            </div>
+            <div class="settings-row">
+              <label>
+                <span>搜索市集间隔（秒）</span>
+                <input value="60" />
+              </label>
+              <label>
+                <span>购买数量</span>
+                <input value="3" />
+              </label>
+              <label>
+                <span>直传快捷键</span>
+                <input value="F8" />
+              </label>
+              <label>
+                <span>按F8直传下个卖家仓库，或按下列间隔传送（秒）</span>
+                <input value="30" />
+              </label>
+            </div>
+            <button class="primary-button" type="button">添加搜索</button>
+          </form>
+        </section>
+
+        <section class="panel list-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">监控列表</p>
+              <h2>已保存搜索</h2>
+            </div>
+            <button class="icon-button" type="button">↻</button>
+          </div>
+          <div class="watch-list">
+            <article class="watch-card">
+              <div class="watch-title-row">
+                <h3>高抗戒指</h3>
+                <span class="watch-badge good">有结果</span>
+              </div>
+              <p class="watch-progress">购买进度 <strong>2/3</strong></p>
+              <p class="watch-meta">搜索 60s · 传送间隔 30s · 最近检查 06/01 17:20:31</p>
+              <div class="watch-actions">
+                <button type="button">检查</button>
+                <button type="button">打开</button>
+                <button type="button">暂停</button>
+                <button class="danger" type="button">删除</button>
+              </div>
+            </article>
+            <article class="watch-card">
+              <div class="watch-title-row">
+                <h3>稀有项链</h3>
+                <span class="watch-badge">无结果</span>
+              </div>
+              <p class="watch-progress">购买进度 <strong>0/1</strong></p>
+              <p class="watch-meta">搜索 45s · 传送间隔 30s · 最近检查 06/01 17:19:58</p>
+              <div class="watch-actions">
+                <button type="button">检查</button>
+                <button type="button">打开</button>
+                <button type="button">暂停</button>
+                <button class="danger" type="button">删除</button>
+              </div>
+            </article>
+            <article class="watch-card">
+              <div class="watch-title-row">
+                <h3>召唤魔杖</h3>
+                <span class="watch-badge good">有结果</span>
+              </div>
+              <p class="watch-progress">购买进度 <strong>4/5</strong></p>
+              <p class="watch-meta">搜索 90s · 传送间隔 30s · 最近检查 06/01 17:18:44</p>
+              <div class="watch-actions">
+                <button type="button">检查</button>
+                <button type="button">打开</button>
+                <button type="button">暂停</button>
+                <button class="danger" type="button">删除</button>
+              </div>
+            </article>
+            <article class="watch-card">
+              <div class="watch-title-row">
+                <h3>便宜通货</h3>
+                <span class="watch-badge paused">已暂停</span>
+              </div>
+              <p class="watch-progress">购买进度 <strong>10/10</strong></p>
+              <p class="watch-meta">搜索 60s · 传送间隔 30s · 达到购买数量</p>
+              <div class="watch-actions">
+                <button type="button">检查</button>
+                <button type="button">打开</button>
+                <button type="button">启用</button>
+                <button class="danger" type="button">删除</button>
+              </div>
+            </article>
+            <article class="watch-card">
+              <div class="watch-title-row">
+                <h3>技能宝石</h3>
+                <span class="watch-badge">待检查</span>
+              </div>
+              <p class="watch-progress">购买进度 <strong>0/2</strong></p>
+              <p class="watch-meta">搜索 120s · 传送间隔 30s · 最近检查 从未</p>
+              <div class="watch-actions">
+                <button type="button">检查</button>
+                <button type="button">打开</button>
+                <button type="button">暂停</button>
+                <button class="danger" type="button">删除</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel log-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">提醒记录</p>
+              <h2>最近触发</h2>
+            </div>
+            <button class="secondary-button compact" type="button">清空</button>
+          </div>
+          <div class="event-log">
+            <article class="log-item">
+              <strong>高抗戒指</strong>
+              <span>06/01 17:20:31 · 点击 2 个仓库</span>
+              <button type="button">打开页面</button>
+            </article>
+            <article class="log-item">
+              <strong>召唤魔杖</strong>
+              <span>06/01 17:18:44 · 跳过 1 个已忽略卖家</span>
+              <button type="button">打开页面</button>
+            </article>
+          </div>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

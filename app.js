@@ -4,6 +4,10 @@ const form = document.querySelector("#watchForm");
 const nameInput = document.querySelector("#watchName");
 const urlInput = document.querySelector("#watchUrl");
 const intervalInput = document.querySelector("#watchInterval");
+const quantityInput = document.querySelector("#watchQuantity");
+const travelDelayInput = document.querySelector("#watchTravelDelay");
+const hotkeyInput = document.querySelector("#watchHotkey");
+const travelDelayLabel = document.querySelector("#watchTravelDelayLabel");
 const selectorInput = document.querySelector("#watchSelector");
 const watchList = document.querySelector("#watchList");
 const eventLog = document.querySelector("#eventLog");
@@ -64,9 +68,21 @@ function formatDate(value) {
 
 function formatStatus(watch) {
   if (watch.lastError) return "异常";
+  if ((watch.purchasedQuantity || 0) >= (watch.targetQuantity || 1)) return "已完成";
+  if (!watch.enabled) return "已暂停";
   if (watch.lastResultCount > 0) return "有结果";
   if (watch.lastCheckedAt) return "无结果";
   return "待检查";
+}
+
+function normalizeHotkey(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  return /^F([1-9]|1[0-2])$/.test(normalized) ? normalized : "F8";
+}
+
+function updateTravelDelayLabel() {
+  const hotkey = normalizeHotkey(hotkeyInput.value);
+  travelDelayLabel.textContent = `按${hotkey}直传下个卖家仓库，或按下列间隔传送（秒）`;
 }
 
 function setState(nextState) {
@@ -121,11 +137,12 @@ function renderWatches() {
     const node = watchTemplate.content.firstElementChild.cloneNode(true);
     node.dataset.id = watch.id;
     node.querySelector("h3").textContent = watch.name;
-    node.querySelector(".watch-url").textContent = watch.url;
     node.querySelector(".watch-badge").textContent = formatStatus(watch);
     node.querySelector(".watch-badge").dataset.status = formatStatus(watch);
+    node.querySelector(".watch-progress").innerHTML =
+      `购买进度 <strong>${watch.purchasedQuantity || 0}/${watch.targetQuantity || 1}</strong>`;
     node.querySelector(".watch-meta").textContent =
-      `${watch.intervalSeconds}s 一次 · 最近检查 ${formatTime(watch.lastCheckedAt)} · 结果 ${watch.lastResultCount ?? 0}`;
+      `搜索 ${watch.intervalSeconds}s · 传送间隔 ${watch.travelDelaySeconds || 30}s · 快捷键 ${watch.travelHotkey || "F8"} · 最近检查 ${formatTime(watch.lastCheckedAt)} · 结果 ${watch.lastResultCount ?? 0}`;
     node.querySelector('[data-action="toggle"]').textContent = watch.enabled ? "暂停" : "启用";
 
     if (watch.lastError) {
@@ -167,13 +184,47 @@ form.addEventListener("submit", async (event) => {
     name: nameInput.value.trim(),
     url: urlInput.value.trim(),
     intervalSeconds: Number(intervalInput.value) || 60,
+    targetQuantity: Number(quantityInput.value) || 1,
+    travelDelaySeconds: Number(travelDelayInput.value) || 30,
+    travelHotkey: normalizeHotkey(hotkeyInput.value),
     selector: selectorInput.value.trim(),
   });
 
   form.reset();
   intervalInput.value = "60";
+  quantityInput.value = "1";
+  travelDelayInput.value = "30";
+  hotkeyInput.value = "F8";
+  updateTravelDelayLabel();
   selectorInput.value = ".resultset .row[data-id], .resultset [data-id]";
   await refreshState();
+});
+
+hotkeyInput.addEventListener("keydown", (event) => {
+  event.preventDefault();
+  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+    hotkeyInput.setCustomValidity("快捷键只支持单个 F1-F12。");
+    hotkeyInput.reportValidity();
+    return;
+  }
+
+  if (/^F([1-9]|1[0-2])$/.test(event.key.toUpperCase())) {
+    hotkeyInput.value = event.key.toUpperCase();
+    hotkeyInput.setCustomValidity("");
+    updateTravelDelayLabel();
+    return;
+  }
+
+  hotkeyInput.setCustomValidity("快捷键只支持单个 F1-F12。");
+  hotkeyInput.reportValidity();
+});
+
+hotkeyInput.addEventListener("input", updateTravelDelayLabel);
+
+hotkeyInput.addEventListener("blur", () => {
+  hotkeyInput.value = normalizeHotkey(hotkeyInput.value);
+  hotkeyInput.setCustomValidity("");
+  updateTravelDelayLabel();
 });
 
 watchList.addEventListener("click", async (event) => {
@@ -243,3 +294,4 @@ api.onTriggered(() => refreshState());
 
 refreshState();
 api.getUpdateStatus().then(setUpdateState);
+updateTravelDelayLabel();

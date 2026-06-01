@@ -63,24 +63,35 @@
           </div>
 
           <form id="watchForm" class="watch-form">
-            <label>
-              <span>名称</span>
-              <input id="watchName" maxlength="40" placeholder="例如：高抗戒指" required />
-            </label>
-            <label>
-              <span>搜索 URL</span>
-              <input id="watchUrl" placeholder="https://www.pathofexile.com/trade2/search/poe2/..." required />
-            </label>
-            <div class="form-row">
+            <div class="top-row">
               <label>
-                <span>检查间隔（秒）</span>
+                <span>名称</span>
+                <input id="watchName" maxlength="40" placeholder="例如：高抗戒指" required />
+              </label>
+              <label>
+                <span>设置好搜索条件的集市网址复制到这里</span>
+                <input id="watchUrl" placeholder="https://www.pathofexile.com/trade2/search/poe2/..." required />
+              </label>
+            </div>
+            <div class="settings-row">
+              <label>
+                <span>搜索市集间隔（秒）</span>
                 <input id="watchInterval" min="30" step="5" type="number" value="60" />
               </label>
               <label>
-                <span>结果选择器</span>
-                <input id="watchSelector" value=".resultset .row[data-id], .resultset [data-id]" />
+                <span>购买数量</span>
+                <input id="watchQuantity" max="999" min="1" step="1" type="number" value="1" />
+              </label>
+              <label>
+                <span>直传快捷键</span>
+                <input id="watchHotkey" autocomplete="off" maxlength="3" value="F8" />
+              </label>
+              <label>
+                <span id="watchTravelDelayLabel">按F8直传下个卖家仓库，或按下列间隔传送（秒）</span>
+                <input id="watchTravelDelay" min="1" step="1" type="number" value="30" />
               </label>
             </div>
+            <input id="watchSelector" type="hidden" value=".resultset .row[data-id], .resultset [data-id]" />
             <button class="primary-button" type="submit">添加搜索</button>
           </form>
         </section>
@@ -116,7 +127,7 @@
             <h3></h3>
             <span class="watch-badge"></span>
           </div>
-          <p class="watch-url"></p>
+          <p class="watch-progress"></p>
           <div class="watch-meta"></div>
         </div>
         <div class="watch-actions">
