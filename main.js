@@ -592,12 +592,6 @@ function registerIpc() {
     });
 
     setImmediate(() => {
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) {
-          window.removeAllListeners("close");
-          window.destroy();
-        }
-      }
       autoUpdater.quitAndInstall(true, true);
     });
     return true;
